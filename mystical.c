@@ -268,10 +268,11 @@ static unsigned long mystical_draw(Display *dpy, Window window, void *closure) {
 static void mystical_reshape(Display *dpy, Window window, void *closure,
                              unsigned int w, unsigned int h) {
   struct state *st = (struct state *) closure;
-  if (!st->dbuf) { /* #### more complicated if we have a back buffer... */
-    XGetWindowAttributes (st->dpy, st->window, &st->xgwa);
-    XClearWindow (dpy, window);
-    /* TODO: Just reinit the shapes here. */
+  int i;
+  /* Just reinit the shapes. */
+  for (i = 0; i < st->nshapes; ++i) {
+    free_shape(dpy, st->shapes[i]);
+    st->shapes[i] = make_shape(st, st->b, w, h);
   }
 }
 
