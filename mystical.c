@@ -1,5 +1,8 @@
 /* mystical, Copyright (c) 2020 Josh Simmons <josh.simmons@gmail.com>
  *
+ * This is inspired by the old "Mystify" screensaver on Windows, but is original
+ * code.
+ *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that
  * the above copyright notice appear in all copies and that both that
@@ -9,7 +12,6 @@
  * implied warranty.
  */
 
-#include <math.h>
 #include "screenhack.h"
 
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
@@ -54,9 +56,7 @@ struct state {
 # endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
 };
 
-static void
-draw_shape (struct state *st, Drawable w, struct shape *s)
-{
+static void draw_shape(struct state *st, Drawable w, struct shape *s) {
   int i;
   for (i = 0; i < s->npolys; ++i) {
     XDrawLines(st->dpy, w, s->gc, s->polys[i], s->npoints + 1, CoordModeOrigin);
@@ -68,21 +68,31 @@ static struct shape *make_shape(struct state *st, Drawable d, int w, int h) {
   int speed;
   XGCValues gcv;
   struct shape* s = (struct shape*) malloc(sizeof(struct shape));
+
   s->npolys = st->npolys;
   s->npoints = st->npoints;
   s->lead_poly = 0;
 
   s->polys = (XPoint**) malloc(s->npolys * sizeof(XPoint*));
-  for (i = 0; i < s->npolys; ++i) {
-    /* Here we allocate one extra XPoint to duplicate the first. */
+
+  /* Initialize the first poly (the lead poly).
+   * One extra XPoint is allocated for the duplicate of the first. */
+  s->polys[0] = (XPoint*) malloc((s->npoints + 1) * sizeof(XPoint));
+  for (j = 0; j < s->npoints; ++j) {
+    s->polys[0][j].x = random() % w;
+    s->polys[0][j].y = random() % h;
+  }
+  /* Duplicate the first point in the last position. */
+  s->polys[0][j].x = s->polys[0][0].x;
+  s->polys[0][j].y = s->polys[0][0].y;
+
+  for (i = 1; i < s->npolys; ++i) {
+    /* Hide the rest of the polygons behind the first. */
     s->polys[i] = (XPoint*) malloc((s->npoints + 1) * sizeof(XPoint));
-    for (j = 0; j < s->npoints; ++j) {
-      s->polys[i][j].x = random() % w;
-      s->polys[i][j].y = random() % h;
+    for (j = 0; j < s->npoints + 1; ++j) {
+      s->polys[i][j].x = s->polys[0][j].x;
+      s->polys[i][j].y = s->polys[0][j].y;
     }
-    /* Duplicate the first point in the last position. */
-    s->polys[i][j].x = s->polys[i][0].x;
-    s->polys[i][j].y = s->polys[i][0].y;
   }
 
   speed = get_integer_resource (st->dpy, "speed", "Speed");
@@ -158,7 +168,7 @@ static void update_shape(struct shape* s, int w, int h) {
   lead[i].y = lead[0].y;
 }
 
-static void *mystify_init(Display *dpy, Window window) {
+static void *mystical_init(Display *dpy, Window window) {
   struct state *st = (struct state *)malloc(sizeof(struct state));
   XGCValues gcv;
   int i;
@@ -219,7 +229,7 @@ static void *mystify_init(Display *dpy, Window window) {
   return st;
 }
 
-static unsigned long mystify_draw(Display *dpy, Window window, void *closure) {
+static unsigned long mystical_draw(Display *dpy, Window window, void *closure) {
   struct state *st = (struct state *)closure;
   int i;
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
@@ -255,8 +265,8 @@ static unsigned long mystify_draw(Display *dpy, Window window, void *closure) {
   return st->delay;
 }
 
-static void mystify_reshape(Display *dpy, Window window, void *closure,
-                            unsigned int w, unsigned int h) {
+static void mystical_reshape(Display *dpy, Window window, void *closure,
+                             unsigned int w, unsigned int h) {
   struct state *st = (struct state *) closure;
   if (!st->dbuf) { /* #### more complicated if we have a back buffer... */
     XGetWindowAttributes (st->dpy, st->window, &st->xgwa);
@@ -265,13 +275,13 @@ static void mystify_reshape(Display *dpy, Window window, void *closure,
   }
 }
 
-static Bool mystify_event(Display *dpy, Window window, void *closure,
-                          XEvent *event) {
+static Bool mystical_event(Display *dpy, Window window, void *closure,
+                           XEvent *event) {
   return False;
 }
 
 static void
-mystify_free (Display *dpy, Window window, void *closure)
+mystical_free (Display *dpy, Window window, void *closure)
 {
   struct state *st = (struct state *) closure;
   int i;
@@ -287,7 +297,7 @@ mystify_free (Display *dpy, Window window, void *closure)
 }
 
 
-static const char *mystify_defaults [] = {
+static const char *mystical_defaults [] = {
   ".background:		black",
   ".foreground:		white",
   "*delay:		30000",
@@ -307,7 +317,7 @@ static const char *mystify_defaults [] = {
   0
 };
 
-static XrmOptionDescRec mystify_options[] = {
+static XrmOptionDescRec mystical_options[] = {
     {"-delay", ".delay", XrmoptionSepArg, 0},
     {"-points", ".points", XrmoptionSepArg, 0},
     {"-polys", ".polys", XrmoptionSepArg, 0},
@@ -318,4 +328,4 @@ static XrmOptionDescRec mystify_options[] = {
     {"-no-db", ".doubleBuffer", XrmoptionNoArg, "False"},
     {0, 0, 0, 0}};
 
-XSCREENSAVER_MODULE ("Mystify", mystify)
+XSCREENSAVER_MODULE ("Mystical", mystical)
