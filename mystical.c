@@ -20,8 +20,9 @@
 
 struct shape {
   /* Number of points in each polygon. Note that we include enough room in the
-   * array for a duplicate of the first point to make draw calls easier. If
-   * npoints = 4, then there are actually 5 XPoints per polygon array. */
+   * array for a duplicate of the first point to make draw calls easier. For
+   * example, if npoints = 4, then there are actually 5 XPoints per polygon
+   * array. */
   int npoints;
   /* Number of polygons in the shape (the head plus the tails). */
   int npolys;
@@ -69,17 +70,17 @@ static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
   int i, j;
   int speed;
   XGCValues gcv;
-  struct shape* s = (struct shape*) malloc(sizeof(struct shape));
+  struct shape *s = (struct shape *)malloc(sizeof(struct shape));
 
   s->npolys = st->npolys;
   s->npoints = st->npoints;
   s->lead_poly = 0;
 
-  s->polys = (XPoint**) malloc(s->npolys * sizeof(XPoint*));
+  s->polys = (XPoint **)calloc(s->npolys, sizeof(XPoint *));
 
   /* Initialize the first poly (the lead poly).
    * One extra XPoint is allocated for the duplicate of the first. */
-  s->polys[0] = (XPoint*) malloc((s->npoints + 1) * sizeof(XPoint));
+  s->polys[0] = (XPoint *)calloc(s->npoints + 1, sizeof(XPoint));
   for (j = 0; j < s->npoints; ++j) {
     s->polys[0][j].x = random() % w;
     s->polys[0][j].y = random() % h;
@@ -90,15 +91,15 @@ static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
 
   for (i = 1; i < s->npolys; ++i) {
     /* Hide the rest of the polygons behind the first. */
-    s->polys[i] = (XPoint*) malloc((s->npoints + 1) * sizeof(XPoint));
+    s->polys[i] = (XPoint *)calloc(s->npoints + 1, sizeof(XPoint));
     for (j = 0; j < s->npoints + 1; ++j) {
       s->polys[i][j].x = s->polys[0][j].x;
       s->polys[i][j].y = s->polys[0][j].y;
     }
   }
 
-  speed = get_integer_resource (st->dpy, "speed", "Speed");
-  s->vels = (XPoint*) malloc(s->npoints * sizeof(XPoint));
+  speed = get_integer_resource(st->dpy, "speed", "Speed");
+  s->vels = (XPoint *)calloc(s->npoints, sizeof(XPoint));
   for (i = 0; i < s->npoints; ++i) {
     s->vels[i].x = random() % speed - (speed / 2);
     s->vels[i].y = random() % speed - (speed / 2);
@@ -169,8 +170,31 @@ static void update_shape(struct shape* s, int w, int h) {
   lead[i].y = lead[0].y;
 }
 
+static void print_state(struct state* st) {
+  printf("Display *dpy = %p\n", (void*)st->dpy);
+  printf("Window window = %ld\n", st->window);
+
+  printf("int nshapes = %d\n", st->nshapes);
+  printf("struct shape **shapes = %p\n", (void*)st->shapes);
+  printf("XColor* colors = %p\n", (void*)st->colors);
+
+  printf("int npolys = %d\n", st->npolys);
+  printf("int npoints = %d\n", st->npoints);
+
+  printf("Bool dbuf = %d\n", st->dbuf);
+  printf("int delay = %d\n", st->delay);
+  printf("Pixmap b = %ld\n", st->b);
+  printf("Pixmap ba = %ld\n", st->ba);
+  printf("Pixmap bb = %ld\n", st->bb);
+
+# ifdef HAVE_DOUBLE_BUFFER_EXTENSION
+  printf("Bool dbeclear_p = %d\n", st->dbeclear_p);
+  printf("XdbeBackBuffer backb = %ld\n", st->backb);
+# endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
+}
+
 static void *mystical_init(Display *dpy, Window window) {
-  struct state *st = (struct state *)malloc(sizeof(struct state));
+  struct state *st = (struct state *)calloc(1, sizeof(struct state));
   XGCValues gcv;
   int i;
   st->dpy = dpy;
@@ -211,11 +235,11 @@ static void *mystical_init(Display *dpy, Window window) {
     st->b = st->window;
   }
 
-  st->colors = (XColor *)malloc(st->nshapes * sizeof(XColor));
+  st->colors = (XColor *)calloc(st->nshapes, sizeof(XColor));
   make_random_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
                        st->colors, &st->nshapes, True, True, 0, True);
 
-  st->shapes = (struct shape **)malloc(st->nshapes * sizeof(struct shape *));
+  st->shapes = (struct shape **)calloc(st->nshapes, sizeof(struct shape *));
   for (i = 0; i < st->nshapes; ++i) {
     st->shapes[i] = make_shape(st, st->b, st->xgwa.width, st->xgwa.height,
                                st->colors[i].pixel);
