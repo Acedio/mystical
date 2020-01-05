@@ -18,10 +18,6 @@
 # include "xdbe.h"
 #endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
 
-/* TODO:
- *  - Random bounces (always seem to be in the correct quadrant, though).
- */
-
 #define NCOLORS 1024
 
 struct shape {
@@ -48,13 +44,17 @@ struct state {
 
   int nshapes;
   struct shape **shapes;
-  int ncolors;
-  XColor *colors;
-
   int npolys;
   int npoints;
 
+  int max_speed;
   int delay;
+
+  int w, h;
+
+  int ncolors;
+  XColor *colors;
+
   Bool dbuf;
   GC erase_gc;
   XWindowAttributes xgwa;
@@ -65,6 +65,19 @@ struct state {
   XdbeBackBuffer backb;
 # endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
 };
+
+static int random_speed(int max_speed) {
+  int min_speed = max_speed / 5;
+  return min_speed + (random() % (max_speed - min_speed));
+}
+
+static int random_velocity(int positive, int max_speed) {
+  if (positive) {
+    return random_speed(max_speed);
+  } else {
+    return -random_speed(max_speed);
+  }
+}
 
 static void draw_shape(struct state *st, Drawable w, struct shape *s) {
   int i;
@@ -77,7 +90,6 @@ static void draw_shape(struct state *st, Drawable w, struct shape *s) {
 static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
                                 int color_index) {
   int i, j;
-  int speed;
   XGCValues gcv;
   struct shape *s = (struct shape *)malloc(sizeof(struct shape));
 
@@ -107,17 +119,15 @@ static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
     }
   }
 
-  speed = get_integer_resource(st->dpy, "speed", "Speed");
   s->vels = (XPoint *)calloc(s->npoints, sizeof(XPoint));
   for (i = 0; i < s->npoints; ++i) {
-    s->vels[i].x = random() % speed - (speed / 2);
-    s->vels[i].y = random() % speed - (speed / 2);
+    s->vels[i].x = random_velocity(random() & 1, st->max_speed);
+    s->vels[i].y = random_velocity(random() & 1, st->max_speed);
   }
 
   s->color_index = color_index;
   gcv.foreground = st->colors[color_index].pixel;
   gcv.line_width = get_integer_resource(st->dpy, "thickness", "Thickness");
-  if (st->xgwa.width > 2560) gcv.line_width *= 3; /* Retina displays */
   gcv.join_style = JoinBevel;
 
   s->gc = XCreateGC(
@@ -140,7 +150,8 @@ static void free_shape(Display *dpy, struct shape *s) {
   }
 }
 
-static void update_shape(struct shape* s, int w, int h, int ncolors) {
+static void update_shape(struct shape *s, int w, int h, int max_speed,
+                         int ncolors) {
   int i;
   XPoint *prev;
   XPoint *lead;
@@ -156,22 +167,22 @@ static void update_shape(struct shape* s, int w, int h, int ncolors) {
   for (i = 0; i < s->npoints; ++i) {
     lead[i].x = prev[i].x + s->vels[i].x;
     if (s->vels[i].x > 0 && lead[i].x >= w) {
-      s->vels[i].x = -s->vels[i].x;
       /* If x = w, we've overshot the edge by 1 px. New x should be w - 2. */
       lead[i].x = (w - 1) - (lead[i].x - (w - 1));
+      s->vels[i].x = random_velocity(s->vels[i].x < 0, max_speed);
     } else if (s->vels[i].x < 0 && lead[i].x < 0) {
-      s->vels[i].x = -s->vels[i].x;
       lead[i].x = -lead[i].x;
+      s->vels[i].x = random_velocity(s->vels[i].x < 0, max_speed);
     }
 
     lead[i].y = prev[i].y + s->vels[i].y;
     if (s->vels[i].y > 0 && lead[i].y >= h) {
-      s->vels[i].y = -s->vels[i].y;
       /* If y = h, we've overshot the edge by 1 px. New y should be h - 2. */
       lead[i].y = (h - 1) - (lead[i].y - (h - 1));
+      s->vels[i].y = random_velocity(s->vels[i].y < 0, max_speed);
     } else if (s->vels[i].y < 0 && lead[i].y < 0) {
-      s->vels[i].y = -s->vels[i].y;
       lead[i].y = -lead[i].y;
+      s->vels[i].y = random_velocity(s->vels[i].y < 0, max_speed);
     }
   }
   /* Duplicate the first point in the last position. */
@@ -194,6 +205,7 @@ static void *mystical_init(Display *dpy, Window window) {
   st->nshapes = get_integer_resource (st->dpy, "shapes", "Integer");
   st->npolys = get_integer_resource (st->dpy, "polys", "Integer");
   st->npoints = get_integer_resource (st->dpy, "points", "Integer");
+  st->max_speed = get_integer_resource(st->dpy, "speed", "Speed");
   st->delay = get_integer_resource (st->dpy, "delay", "Integer");
   st->dbuf = get_boolean_resource (st->dpy, "doubleBuffer", "Boolean");
 
@@ -205,7 +217,9 @@ static void *mystical_init(Display *dpy, Window window) {
   st->dbuf = False;
 # endif
 
-  XGetWindowAttributes (st->dpy, st->window, &st->xgwa);
+  XGetWindowAttributes(st->dpy, st->window, &st->xgwa);
+  st->w = st->xgwa.width;
+  st->h = st->xgwa.height;
 
   if (st->dbuf) {
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
@@ -234,8 +248,8 @@ static void *mystical_init(Display *dpy, Window window) {
 
   st->shapes = (struct shape **)calloc(st->nshapes, sizeof(struct shape *));
   for (i = 0; i < st->nshapes; ++i) {
-    st->shapes[i] = make_shape(st, st->b, st->xgwa.width, st->xgwa.height,
-                               random() % st->ncolors);
+    st->shapes[i] =
+        make_shape(st, st->b, st->w, st->h, i * (st->ncolors / st->nshapes));
   }
 
   gcv.foreground = get_pixel_resource(st->dpy, st->xgwa.colormap, "background",
@@ -262,7 +276,7 @@ static unsigned long mystical_draw(Display *dpy, Window window, void *closure) {
                    st->xgwa.height);
 
   for (i = 0; i < st->nshapes; ++i) {
-    update_shape(st->shapes[i], st->xgwa.width, st->xgwa.height, st->ncolors);
+    update_shape(st->shapes[i], st->w, st->h, st->max_speed, st->ncolors);
   }
   for (i = 0; i < st->nshapes; ++i) {
     draw_shape(st, st->b, st->shapes[i]);
@@ -292,10 +306,14 @@ static void mystical_reshape(Display *dpy, Window window, void *closure,
                              unsigned int w, unsigned int h) {
   struct state *st = (struct state *) closure;
   int i;
+  st->w = w;
+  st->h = h;
+
   /* Just reinit the shapes. */
   for (i = 0; i < st->nshapes; ++i) {
     free_shape(dpy, st->shapes[i]);
-    st->shapes[i] = make_shape(st, st->b, w, h, random() % st->ncolors);
+    st->shapes[i] =
+        make_shape(st, st->b, st->w, st->h, i * (st->ncolors / st->nshapes));
   }
 }
 
@@ -325,7 +343,7 @@ static const char *mystical_defaults [] = {
   "*points:    4",
   "*polys:    5",
   "*shapes:		2",
-  "*speed:		45",
+  "*speed:		25",
   "*thickness:		1",
   "*doubleBuffer:	True",
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
