@@ -40,6 +40,7 @@ struct state {
 
   int nshapes;
   struct shape **shapes;
+  XColor* colors;  /* One per shape. */
 
   int npolys;
   int npoints;
@@ -63,7 +64,8 @@ static void draw_shape(struct state *st, Drawable w, struct shape *s) {
   }
 }
 
-static struct shape *make_shape(struct state *st, Drawable d, int w, int h) {
+static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
+                                unsigned long color) {
   int i, j;
   int speed;
   XGCValues gcv;
@@ -102,8 +104,7 @@ static struct shape *make_shape(struct state *st, Drawable d, int w, int h) {
     s->vels[i].y = random() % speed - (speed / 2);
   }
 
-  gcv.foreground = get_pixel_resource(st->dpy, st->xgwa.colormap, "foreground",
-                                      "Foreground");
+  gcv.foreground = color;
   gcv.line_width = get_integer_resource(st->dpy, "thickness", "Thickness");
   if (st->xgwa.width > 2560) gcv.line_width *= 3; /* Retina displays */
   gcv.cap_style = CapProjecting;
@@ -210,9 +211,14 @@ static void *mystical_init(Display *dpy, Window window) {
     st->b = st->window;
   }
 
-  st->shapes = (struct shape **)malloc(st->nshapes * sizeof(struct shape*));
+  st->colors = (XColor *)malloc(st->nshapes * sizeof(XColor));
+  make_random_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
+                       st->colors, &st->nshapes, True, True, 0, True);
+
+  st->shapes = (struct shape **)malloc(st->nshapes * sizeof(struct shape *));
   for (i = 0; i < st->nshapes; ++i) {
-    st->shapes[i] = make_shape(st, st->b, st->xgwa.width, st->xgwa.height);
+    st->shapes[i] = make_shape(st, st->b, st->xgwa.width, st->xgwa.height,
+                               st->colors[i].pixel);
   }
 
   gcv.foreground = get_pixel_resource(st->dpy, st->xgwa.colormap, "background",
@@ -272,7 +278,7 @@ static void mystical_reshape(Display *dpy, Window window, void *closure,
   /* Just reinit the shapes. */
   for (i = 0; i < st->nshapes; ++i) {
     free_shape(dpy, st->shapes[i]);
-    st->shapes[i] = make_shape(st, st->b, w, h);
+    st->shapes[i] = make_shape(st, st->b, w, h, st->colors[i].pixel);
   }
 }
 
@@ -281,9 +287,7 @@ static Bool mystical_event(Display *dpy, Window window, void *closure,
   return False;
 }
 
-static void
-mystical_free (Display *dpy, Window window, void *closure)
-{
+static void mystical_free(Display *dpy, Window window, void *closure) {
   struct state *st = (struct state *) closure;
   int i;
   XFreeGC (dpy, st->erase_gc);
@@ -294,13 +298,12 @@ mystical_free (Display *dpy, Window window, void *closure)
     free_shape(dpy, st->shapes[i]);
   }
   free (st->shapes);
+  free (st->colors);
   free(st);
 }
 
-
 static const char *mystical_defaults [] = {
   ".background:		black",
-  ".foreground:		white",
   "*delay:		30000",
   "*points:    4",
   "*polys:    5",
