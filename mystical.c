@@ -108,11 +108,10 @@ static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
   gcv.foreground = color;
   gcv.line_width = get_integer_resource(st->dpy, "thickness", "Thickness");
   if (st->xgwa.width > 2560) gcv.line_width *= 3; /* Retina displays */
-  gcv.cap_style = CapProjecting;
-  gcv.join_style = JoinMiter;
+  gcv.join_style = JoinBevel;
 
   s->gc = XCreateGC(
-      st->dpy, d, GCForeground | GCLineWidth | GCCapStyle | GCJoinStyle, &gcv);
+      st->dpy, d, GCForeground | GCLineWidth | GCJoinStyle, &gcv);
   return s;
 }
 
@@ -168,29 +167,6 @@ static void update_shape(struct shape* s, int w, int h) {
   /* Duplicate the first point in the last position. */
   lead[i].x = lead[0].x;
   lead[i].y = lead[0].y;
-}
-
-static void print_state(struct state* st) {
-  printf("Display *dpy = %p\n", (void*)st->dpy);
-  printf("Window window = %ld\n", st->window);
-
-  printf("int nshapes = %d\n", st->nshapes);
-  printf("struct shape **shapes = %p\n", (void*)st->shapes);
-  printf("XColor* colors = %p\n", (void*)st->colors);
-
-  printf("int npolys = %d\n", st->npolys);
-  printf("int npoints = %d\n", st->npoints);
-
-  printf("Bool dbuf = %d\n", st->dbuf);
-  printf("int delay = %d\n", st->delay);
-  printf("Pixmap b = %ld\n", st->b);
-  printf("Pixmap ba = %ld\n", st->ba);
-  printf("Pixmap bb = %ld\n", st->bb);
-
-# ifdef HAVE_DOUBLE_BUFFER_EXTENSION
-  printf("Bool dbeclear_p = %d\n", st->dbeclear_p);
-  printf("XdbeBackBuffer backb = %ld\n", st->backb);
-# endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
 }
 
 static void *mystical_init(Display *dpy, Window window) {
