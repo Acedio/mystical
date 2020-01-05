@@ -39,6 +39,9 @@ struct state {
   int nshapes;
   struct shape **shapes;
 
+  int npolys;
+  int npoints;
+
   int delay;
   Bool dbuf;
   GC erase_gc;
@@ -60,14 +63,13 @@ draw_shape (struct state *st, Drawable w, struct shape *s)
   }
 }
 
-static struct shape *make_shape(struct state *st, Drawable d, int npoints,
-                                int npolys, int w, int h) {
+static struct shape *make_shape(struct state *st, Drawable d, int w, int h) {
   int i, j;
   int speed;
   XGCValues gcv;
   struct shape* s = (struct shape*) malloc(sizeof(struct shape));
-  s->npolys = npolys;
-  s->npoints = npoints;
+  s->npolys = st->npolys;
+  s->npoints = st->npoints;
   s->lead_poly = 0;
 
   s->polys = (XPoint**) malloc(s->npolys * sizeof(XPoint*));
@@ -162,7 +164,9 @@ static void *mystify_init(Display *dpy, Window window) {
   int i;
   st->dpy = dpy;
   st->window = window;
-  st->nshapes = get_integer_resource (st->dpy, "count", "Integer");
+  st->nshapes = get_integer_resource (st->dpy, "shapes", "Integer");
+  st->npolys = get_integer_resource (st->dpy, "polys", "Integer");
+  st->npoints = get_integer_resource (st->dpy, "points", "Integer");
   st->delay = get_integer_resource (st->dpy, "delay", "Integer");
   st->dbuf = get_boolean_resource (st->dpy, "doubleBuffer", "Boolean");
 
@@ -198,8 +202,7 @@ static void *mystify_init(Display *dpy, Window window) {
 
   st->shapes = (struct shape **)malloc(st->nshapes * sizeof(struct shape*));
   for (i = 0; i < st->nshapes; ++i) {
-    st->shapes[i] =
-        make_shape(st, st->b, 4, 2, st->xgwa.width, st->xgwa.height);
+    st->shapes[i] = make_shape(st, st->b, st->xgwa.width, st->xgwa.height);
   }
 
   gcv.foreground = get_pixel_resource(st->dpy, st->xgwa.colormap, "background",
@@ -287,12 +290,12 @@ mystify_free (Display *dpy, Window window, void *closure)
 static const char *mystify_defaults [] = {
   ".background:		black",
   ".foreground:		white",
-  "*delay:		10000",
-  "*count:		5",
-  "*thickness:		50",
-  "*speed:		15",
-  "*ncolors:		20",
-  "*transparent:	True",
+  "*delay:		30000",
+  "*points:    4",
+  "*polys:    5",
+  "*shapes:		2",
+  "*speed:		45",
+  "*thickness:		1",
   "*doubleBuffer:	True",
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
   "*useDBE:		True",
@@ -304,20 +307,15 @@ static const char *mystify_defaults [] = {
   0
 };
 
-static XrmOptionDescRec mystify_options [] = {
-  { "-delay",		".delay",	XrmoptionSepArg, 0 },
-  { "-thickness",	".thickness",	XrmoptionSepArg, 0 },
-  { "-count",		".count",	XrmoptionSepArg, 0 },
-  { "-ncolors",		".ncolors",	XrmoptionSepArg, 0 },
-  { "-speed",		".speed",	XrmoptionSepArg, 0 },
-  { "-transparent",	".transparent",	 XrmoptionNoArg,  "True"  },
-  { "-no-transparent",	".transparent",	 XrmoptionNoArg,  "False" },
-  { "-opaque",		".transparent",	 XrmoptionNoArg,  "False" },
-  { "-no-opaque",	".transparent",	 XrmoptionNoArg,  "True"  },
-  { "-db",		".doubleBuffer", XrmoptionNoArg,  "True"  },
-  { "-no-db",		".doubleBuffer", XrmoptionNoArg,  "False" },
-  { 0, 0, 0, 0 }
-};
-
+static XrmOptionDescRec mystify_options[] = {
+    {"-delay", ".delay", XrmoptionSepArg, 0},
+    {"-points", ".points", XrmoptionSepArg, 0},
+    {"-polys", ".polys", XrmoptionSepArg, 0},
+    {"-shapes", ".shapes", XrmoptionSepArg, 0},
+    {"-speed", ".speed", XrmoptionSepArg, 0},
+    {"-thickness", ".thickness", XrmoptionSepArg, 0},
+    {"-db", ".doubleBuffer", XrmoptionNoArg, "True"},
+    {"-no-db", ".doubleBuffer", XrmoptionNoArg, "False"},
+    {0, 0, 0, 0}};
 
 XSCREENSAVER_MODULE ("Mystify", mystify)
