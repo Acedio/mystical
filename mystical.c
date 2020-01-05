@@ -54,26 +54,27 @@ struct state {
 static void
 draw_shape (struct state *st, Drawable w, struct shape *s)
 {
-  int i = 0;
-  for (; i < s->npolys; ++i) {
+  int i;
+  for (i = 0; i < s->npolys; ++i) {
     XDrawLines(st->dpy, w, s->gc, s->polys[i], s->npoints + 1, CoordModeOrigin);
   }
 }
 
 static struct shape *make_shape(struct state *st, Drawable d, int npoints,
                                 int npolys, int w, int h) {
-  struct shape* s = (struct shape*) malloc(sizeof(shape));
+  int i, j;
+  int speed;
+  XGCValues gcv;
+  struct shape* s = (struct shape*) malloc(sizeof(struct shape));
   s->npolys = npolys;
   s->npoints = npoints;
   s->lead_poly = 0;
 
   s->polys = (XPoint**) malloc(s->npolys * sizeof(XPoint*));
-  int i = 0;
-  for (; i < s->npolys; ++i) {
+  for (i = 0; i < s->npolys; ++i) {
     /* Here we allocate one extra XPoint to duplicate the first. */
     s->polys[i] = (XPoint*) malloc((s->npoints + 1) * sizeof(XPoint));
-    int j = 0;
-    for (; j < s->npoints; ++j) {
+    for (j = 0; j < s->npoints; ++j) {
       s->polys[i][j].x = random() % w;
       s->polys[i][j].y = random() % h;
     }
@@ -82,23 +83,22 @@ static struct shape *make_shape(struct state *st, Drawable d, int npoints,
     s->polys[i][j].y = s->polys[i][0].y;
   }
 
-  int speed = get_integer_resource (st->dpy, "speed", "Speed");
+  speed = get_integer_resource (st->dpy, "speed", "Speed");
   s->vels = (XPoint*) malloc(s->npoints * sizeof(XPoint));
   for (i = 0; i < s->npoints; ++i) {
     s->vels[i].x = random() % speed - (speed / 2);
     s->vels[i].y = random() % speed - (speed / 2);
   }
 
-  XGCValues gcv;
-  unsigned long flags = GCForeground | GCLineWidth | GCCapStyle | GCJoinStyle;
-
-  gcv.foreground = st->color.pixel;
-  gcv.line_width = st->get_integer_resource(st->dpy, "thickness", "Thickness");
+  gcv.foreground = get_pixel_resource(st->dpy, st->xgwa.colormap, "foreground",
+                                      "Foreground");
+  gcv.line_width = get_integer_resource(st->dpy, "thickness", "Thickness");
   if (st->xgwa.width > 2560) gcv.line_width *= 3; /* Retina displays */
   gcv.cap_style = CapProjecting;
   gcv.join_style = JoinMiter;
 
-  s->gc = XCreateGC (st->dpy, d, flags, &gcv);
+  s->gc = XCreateGC(
+      st->dpy, d, GCForeground | GCLineWidth | GCCapStyle | GCJoinStyle, &gcv);
   return s;
 }
 
@@ -118,16 +118,18 @@ static void free_shape(Display *dpy, struct shape *s) {
 }
 
 static void update_shape(struct shape* s, int w, int h) {
-  /* The previous lead poly becomes the second in line and so forth. */
-  XPoint* prev = s->polys[s->lead_poly];
+  int i;
+  XPoint *prev;
+  XPoint *lead;
 
+  /* The previous lead poly becomes the second in line and so forth. */
+  prev = s->polys[s->lead_poly];
   ++s->lead_poly;
   if (s->lead_poly >= s->npolys) {
     s->lead_poly = 0;
   }
-  XPoint* lead = s->polys[s->lead_poly];
+  lead = s->polys[s->lead_poly];
 
-  int i;
   for (i = 0; i < s->npoints; ++i) {
     lead[i].x = prev[i].x + s->vels[i].x;
     if (s->vels[i].x > 0 && lead[i].x >= w) {
@@ -173,9 +175,6 @@ static void *mystify_init(Display *dpy, Window window) {
 # endif
 
   XGetWindowAttributes (st->dpy, st->window, &st->xgwa);
-
-  st->color.pixel = get_pixel_resource(st->dpy, st->xgwa.colormap, "foreground",
-                                       "Foreground");
 
   if (st->dbuf) {
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
@@ -226,11 +225,11 @@ static unsigned long mystify_draw(Display *dpy, Window window, void *closure) {
     XFillRectangle(st->dpy, st->b, st->erase_gc, 0, 0, st->xgwa.width,
                    st->xgwa.height);
 
-  for (i = 0; i < st->npolys; ++i) {
-    update_shape(st->polys[i], st->xgwa.width, st->xgwa.height);
+  for (i = 0; i < st->nshapes; ++i) {
+    update_shape(st->shapes[i], st->xgwa.width, st->xgwa.height);
   }
-  for (i = 0; i < st->npolys; ++i) {
-    draw_shape(st, st->b, st->polys[i]);
+  for (i = 0; i < st->nshapes; ++i) {
+    draw_shape(st, st->b, st->shapes[i]);
   }
 
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
@@ -257,7 +256,6 @@ static void mystify_reshape(Display *dpy, Window window, void *closure,
                             unsigned int w, unsigned int h) {
   struct state *st = (struct state *) closure;
   if (!st->dbuf) { /* #### more complicated if we have a back buffer... */
-    int i;
     XGetWindowAttributes (st->dpy, st->window, &st->xgwa);
     XClearWindow (dpy, window);
     /* TODO: Just reinit the shapes here. */
@@ -277,7 +275,7 @@ mystify_free (Display *dpy, Window window, void *closure)
   XFreeGC (dpy, st->erase_gc);
   if (st->ba) XFreePixmap (dpy, st->ba);
   if (st->bb) XFreePixmap (dpy, st->bb);
-  for (i = 0; i < st->shapes; i++)
+  for (i = 0; i < st->nshapes; i++)
   {
     free_shape(dpy, st->shapes[i]);
   }
