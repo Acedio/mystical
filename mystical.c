@@ -18,6 +18,12 @@
 # include "xdbe.h"
 #endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
 
+/* TODO:
+ *  - Random bounces (always seem to be in the correct quadrant, though).
+ */
+
+#define NCOLORS 1024
+
 struct shape {
   /* Number of points in each polygon. Note that we include enough room in the
    * array for a duplicate of the first point to make draw calls easier. For
@@ -32,7 +38,8 @@ struct shape {
   /* The velocity of the points in the leading poly. */
   XPoint* vels;
   GC gc;
-  XColor color;
+  /* An index into state->colors. */
+  int color_index;
 };
 
 struct state {
@@ -41,7 +48,8 @@ struct state {
 
   int nshapes;
   struct shape **shapes;
-  XColor* colors;  /* One per shape. */
+  int ncolors;
+  XColor *colors;
 
   int npolys;
   int npoints;
@@ -61,12 +69,13 @@ struct state {
 static void draw_shape(struct state *st, Drawable w, struct shape *s) {
   int i;
   for (i = 0; i < s->npolys; ++i) {
+    XSetForeground(st->dpy, s->gc, st->colors[s->color_index].pixel);
     XDrawLines(st->dpy, w, s->gc, s->polys[i], s->npoints + 1, CoordModeOrigin);
   }
 }
 
 static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
-                                unsigned long color) {
+                                int color_index) {
   int i, j;
   int speed;
   XGCValues gcv;
@@ -105,7 +114,8 @@ static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
     s->vels[i].y = random() % speed - (speed / 2);
   }
 
-  gcv.foreground = color;
+  s->color_index = color_index;
+  gcv.foreground = st->colors[color_index].pixel;
   gcv.line_width = get_integer_resource(st->dpy, "thickness", "Thickness");
   if (st->xgwa.width > 2560) gcv.line_width *= 3; /* Retina displays */
   gcv.join_style = JoinBevel;
@@ -130,7 +140,7 @@ static void free_shape(Display *dpy, struct shape *s) {
   }
 }
 
-static void update_shape(struct shape* s, int w, int h) {
+static void update_shape(struct shape* s, int w, int h, int ncolors) {
   int i;
   XPoint *prev;
   XPoint *lead;
@@ -167,6 +177,12 @@ static void update_shape(struct shape* s, int w, int h) {
   /* Duplicate the first point in the last position. */
   lead[i].x = lead[0].x;
   lead[i].y = lead[0].y;
+
+  /* Rotate the color. */
+  ++s->color_index;
+  if (s->color_index >= ncolors) {
+    s->color_index = 0;
+  }
 }
 
 static void *mystical_init(Display *dpy, Window window) {
@@ -211,14 +227,15 @@ static void *mystical_init(Display *dpy, Window window) {
     st->b = st->window;
   }
 
-  st->colors = (XColor *)calloc(st->nshapes, sizeof(XColor));
-  make_random_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
-                       st->colors, &st->nshapes, True, True, 0, True);
+  st->ncolors = NCOLORS;
+  st->colors = (XColor *)calloc(st->ncolors, sizeof(XColor));
+  make_smooth_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
+                       st->colors, &st->ncolors, True, False, True);
 
   st->shapes = (struct shape **)calloc(st->nshapes, sizeof(struct shape *));
   for (i = 0; i < st->nshapes; ++i) {
     st->shapes[i] = make_shape(st, st->b, st->xgwa.width, st->xgwa.height,
-                               st->colors[i].pixel);
+                               random() % st->ncolors);
   }
 
   gcv.foreground = get_pixel_resource(st->dpy, st->xgwa.colormap, "background",
@@ -245,7 +262,7 @@ static unsigned long mystical_draw(Display *dpy, Window window, void *closure) {
                    st->xgwa.height);
 
   for (i = 0; i < st->nshapes; ++i) {
-    update_shape(st->shapes[i], st->xgwa.width, st->xgwa.height);
+    update_shape(st->shapes[i], st->xgwa.width, st->xgwa.height, st->ncolors);
   }
   for (i = 0; i < st->nshapes; ++i) {
     draw_shape(st, st->b, st->shapes[i]);
@@ -278,7 +295,7 @@ static void mystical_reshape(Display *dpy, Window window, void *closure,
   /* Just reinit the shapes. */
   for (i = 0; i < st->nshapes; ++i) {
     free_shape(dpy, st->shapes[i]);
-    st->shapes[i] = make_shape(st, st->b, w, h, st->colors[i].pixel);
+    st->shapes[i] = make_shape(st, st->b, w, h, random() % st->ncolors);
   }
 }
 
