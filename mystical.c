@@ -15,7 +15,7 @@
 #include "screenhack.h"
 
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
-# include "xdbe.h"
+#include "xdbe.h"
 #endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
 
 #define NCOLORS 1024
@@ -28,11 +28,11 @@ struct shape {
   int npoints;
   /* Number of polygons in the shape (the head plus the tails). */
   int npolys;
-  XPoint** polys;
+  XPoint **polys;
   /* The leading poly. This will change as we rotate through the poly array. */
   int lead_poly;
   /* The velocity of the points in the leading poly. */
-  XPoint* vels;
+  XPoint *vels;
   GC gc;
   /* An index into state->colors. */
   int color_index;
@@ -58,16 +58,21 @@ struct state {
   Bool dbuf;
   GC erase_gc;
   XWindowAttributes xgwa;
-  Pixmap b, ba, bb;	/* double-buffer to reduce flicker */
+  Pixmap b, ba, bb; /* double-buffer to reduce flicker */
 
-# ifdef HAVE_DOUBLE_BUFFER_EXTENSION
+#ifdef HAVE_DOUBLE_BUFFER_EXTENSION
   Bool dbeclear_p;
   XdbeBackBuffer backb;
-# endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
+#endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
 };
 
 static int random_speed(int max_speed) {
-  int min_speed = max_speed / 5;
+  int min_speed;
+  if (max_speed <= 1) {
+    return 1;
+  }
+  min_speed = max_speed / 6;
+  min_speed = min_speed > 1 ? min_speed : 1;
   return min_speed + (random() % (max_speed - min_speed));
 }
 
@@ -130,8 +135,7 @@ static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
   gcv.line_width = get_integer_resource(st->dpy, "thickness", "Thickness");
   gcv.join_style = JoinBevel;
 
-  s->gc = XCreateGC(
-      st->dpy, d, GCForeground | GCLineWidth | GCJoinStyle, &gcv);
+  s->gc = XCreateGC(st->dpy, d, GCForeground | GCLineWidth | GCJoinStyle, &gcv);
   return s;
 }
 
@@ -202,20 +206,20 @@ static void *mystical_init(Display *dpy, Window window) {
   int i;
   st->dpy = dpy;
   st->window = window;
-  st->nshapes = get_integer_resource (st->dpy, "shapes", "Integer");
-  st->npolys = get_integer_resource (st->dpy, "polys", "Integer");
-  st->npoints = get_integer_resource (st->dpy, "points", "Integer");
+  st->nshapes = get_integer_resource(st->dpy, "shapes", "Integer");
+  st->npolys = get_integer_resource(st->dpy, "polys", "Integer");
+  st->npoints = get_integer_resource(st->dpy, "points", "Integer");
   st->max_speed = get_integer_resource(st->dpy, "speed", "Speed");
-  st->delay = get_integer_resource (st->dpy, "delay", "Integer");
-  st->dbuf = get_boolean_resource (st->dpy, "doubleBuffer", "Boolean");
+  st->delay = get_integer_resource(st->dpy, "delay", "Integer");
+  st->dbuf = get_boolean_resource(st->dpy, "doubleBuffer", "Boolean");
 
-# ifdef HAVE_DOUBLE_BUFFER_EXTENSION
-  st->dbeclear_p = get_boolean_resource (st->dpy, "useDBEClear", "Boolean");
+#ifdef HAVE_DOUBLE_BUFFER_EXTENSION
+  st->dbeclear_p = get_boolean_resource(st->dpy, "useDBEClear", "Boolean");
 #endif
 
-# ifdef HAVE_JWXYZ	/* Don't second-guess Quartz's double-buffering */
+#ifdef HAVE_JWXYZ /* Don't second-guess Quartz's double-buffering */
   st->dbuf = False;
-# endif
+#endif
 
   XGetWindowAttributes(st->dpy, st->window, &st->xgwa);
   st->w = st->xgwa.width;
@@ -243,8 +247,13 @@ static void *mystical_init(Display *dpy, Window window) {
 
   st->ncolors = NCOLORS;
   st->colors = (XColor *)calloc(st->ncolors, sizeof(XColor));
-  make_smooth_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
-                       st->colors, &st->ncolors, True, False, True);
+  if (get_boolean_resource(st->dpy, "boldColors", "Boolean") == True) {
+    make_uniform_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
+                          st->colors, &st->ncolors, True, False, True);
+  } else {
+    make_smooth_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
+                         st->colors, &st->ncolors, True, False, True);
+  }
 
   st->shapes = (struct shape **)calloc(st->nshapes, sizeof(struct shape *));
   for (i = 0; i < st->nshapes; ++i) {
@@ -283,28 +292,25 @@ static unsigned long mystical_draw(Display *dpy, Window window, void *closure) {
   }
 
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
-  if (st->backb)
-    {
-      XdbeSwapInfo info[1];
-      info[0].swap_window = st->window;
-      info[0].swap_action = (st->dbeclear_p ? XdbeBackground : XdbeUndefined);
-      XdbeSwapBuffers (st->dpy, info, 1);
-    }
-  else
+  if (st->backb) {
+    XdbeSwapInfo info[1];
+    info[0].swap_window = st->window;
+    info[0].swap_action = (st->dbeclear_p ? XdbeBackground : XdbeUndefined);
+    XdbeSwapBuffers(st->dpy, info, 1);
+  } else
 #endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
-    if (st->dbuf)
-      {
-        XCopyArea (st->dpy, st->b, st->window, st->erase_gc, 0, 0,
-                   st->xgwa.width, st->xgwa.height, 0, 0);
-        st->b = (st->b == st->ba ? st->bb : st->ba);
-      }
+  if (st->dbuf) {
+    XCopyArea(st->dpy, st->b, st->window, st->erase_gc, 0, 0, st->xgwa.width,
+              st->xgwa.height, 0, 0);
+    st->b = (st->b == st->ba ? st->bb : st->ba);
+  }
 
   return st->delay;
 }
 
 static void mystical_reshape(Display *dpy, Window window, void *closure,
                              unsigned int w, unsigned int h) {
-  struct state *st = (struct state *) closure;
+  struct state *st = (struct state *)closure;
   int i;
   st->w = w;
   st->h = h;
@@ -323,48 +329,50 @@ static Bool mystical_event(Display *dpy, Window window, void *closure,
 }
 
 static void mystical_free(Display *dpy, Window window, void *closure) {
-  struct state *st = (struct state *) closure;
+  struct state *st = (struct state *)closure;
   int i;
-  XFreeGC (dpy, st->erase_gc);
-  if (st->ba) XFreePixmap (dpy, st->ba);
-  if (st->bb) XFreePixmap (dpy, st->bb);
-  for (i = 0; i < st->nshapes; i++)
-  {
+  XFreeGC(dpy, st->erase_gc);
+  if (st->ba) XFreePixmap(dpy, st->ba);
+  if (st->bb) XFreePixmap(dpy, st->bb);
+  for (i = 0; i < st->nshapes; i++) {
     free_shape(dpy, st->shapes[i]);
   }
-  free (st->shapes);
-  free (st->colors);
+  free(st->shapes);
+  free(st->colors);
   free(st);
 }
 
 static const char *mystical_defaults [] = {
   ".background:		black",
   "*delay:		30000",
-  "*points:    4",
-  "*polys:    5",
+  "*points:		4",
+  "*polys:		6",
   "*shapes:		2",
-  "*speed:		25",
+  "*speed:		20",
   "*thickness:		1",
+  "*boldColors:		False",
   "*doubleBuffer:	True",
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
   "*useDBE:		True",
   "*useDBEClear:	True",
 #endif /* HAVE_DOUBLE_BUFFER_EXTENSION */
 #ifdef HAVE_MOBILE
-  "*ignoreRotation:     True",
+  "*ignoreRotation:	True",
 #endif
   0
 };
 
 static XrmOptionDescRec mystical_options[] = {
-    {"-delay", ".delay", XrmoptionSepArg, 0},
-    {"-points", ".points", XrmoptionSepArg, 0},
-    {"-polys", ".polys", XrmoptionSepArg, 0},
-    {"-shapes", ".shapes", XrmoptionSepArg, 0},
-    {"-speed", ".speed", XrmoptionSepArg, 0},
-    {"-thickness", ".thickness", XrmoptionSepArg, 0},
-    {"-db", ".doubleBuffer", XrmoptionNoArg, "True"},
-    {"-no-db", ".doubleBuffer", XrmoptionNoArg, "False"},
+    {"-delay",		".delay",		XrmoptionSepArg, 0},
+    {"-points",		".points",		XrmoptionSepArg, 0},
+    {"-polys",		".polys",		XrmoptionSepArg, 0},
+    {"-shapes",		".shapes",		XrmoptionSepArg, 0},
+    {"-speed",		".speed",		XrmoptionSepArg, 0},
+    {"-thickness",	".thickness",		XrmoptionSepArg, 0},
+    {"-bold-colors",	".boldColors",		XrmoptionNoArg,  "True"},
+    {"-no-bold-colors",	".boldColors",		XrmoptionNoArg,  "False"},
+    {"-db",		".doubleBuffer",	XrmoptionNoArg,  "True"},
+    {"-no-db",		".doubleBuffer",	XrmoptionNoArg,  "False"},
     {0, 0, 0, 0}};
 
 XSCREENSAVER_MODULE ("Mystical", mystical)
