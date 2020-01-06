@@ -44,8 +44,8 @@ struct state {
 
   int nshapes;
   struct shape **shapes;
-  int npolys;
   int npoints;
+  int npolys;
 
   int max_speed;
   int delay;
@@ -98,8 +98,8 @@ static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
   XGCValues gcv;
   struct shape *s = (struct shape *)malloc(sizeof(struct shape));
 
-  s->npolys = st->npolys;
   s->npoints = st->npoints;
+  s->npolys = st->npolys;
   s->lead_poly = 0;
 
   s->polys = (XPoint **)calloc(s->npolys, sizeof(XPoint *));
@@ -207,8 +207,8 @@ static void *mystical_init(Display *dpy, Window window) {
   st->dpy = dpy;
   st->window = window;
   st->nshapes = get_integer_resource(st->dpy, "shapes", "Integer");
-  st->npolys = get_integer_resource(st->dpy, "polys", "Integer");
   st->npoints = get_integer_resource(st->dpy, "points", "Integer");
+  st->npolys = get_integer_resource(st->dpy, "polys", "Integer");
   st->max_speed = get_integer_resource(st->dpy, "speed", "Speed");
   st->delay = get_integer_resource(st->dpy, "delay", "Integer");
   st->dbuf = get_boolean_resource(st->dpy, "doubleBuffer", "Boolean");
@@ -345,9 +345,9 @@ static void mystical_free(Display *dpy, Window window, void *closure) {
 static const char *mystical_defaults [] = {
   ".background:		black",
   "*delay:		30000",
+  "*shapes:		2",
   "*points:		4",
   "*polys:		6",
-  "*shapes:		2",
   "*speed:		20",
   "*thickness:		1",
   "*boldColors:		False",
@@ -364,9 +364,9 @@ static const char *mystical_defaults [] = {
 
 static XrmOptionDescRec mystical_options[] = {
     {"-delay",		".delay",		XrmoptionSepArg, 0},
+    {"-shapes",		".shapes",		XrmoptionSepArg, 0},
     {"-points",		".points",		XrmoptionSepArg, 0},
     {"-polys",		".polys",		XrmoptionSepArg, 0},
-    {"-shapes",		".shapes",		XrmoptionSepArg, 0},
     {"-speed",		".speed",		XrmoptionSepArg, 0},
     {"-thickness",	".thickness",		XrmoptionSepArg, 0},
     {"-bold-colors",	".boldColors",		XrmoptionNoArg,  "True"},
