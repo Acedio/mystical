@@ -20,6 +20,8 @@
 
 #define NCOLORS 1024
 
+#define max(a,b) ((a)>(b)?(a):(b))
+
 struct shape {
   /* Number of points in each polygon. Note that we include enough room in the
    * array for a duplicate of the first point to make draw calls easier. For
@@ -132,7 +134,8 @@ static struct shape *make_shape(struct state *st, Drawable d, int w, int h,
 
   s->color_index = color_index;
   gcv.foreground = st->colors[color_index].pixel;
-  gcv.line_width = get_integer_resource(st->dpy, "thickness", "Thickness");
+  gcv.line_width =
+      max(1, get_integer_resource(st->dpy, "thickness", "Thickness"));
   gcv.join_style = JoinBevel;
 
   s->gc = XCreateGC(st->dpy, d, GCForeground | GCLineWidth | GCJoinStyle, &gcv);
@@ -206,10 +209,10 @@ static void *mystical_init(Display *dpy, Window window) {
   int i;
   st->dpy = dpy;
   st->window = window;
-  st->nshapes = get_integer_resource(st->dpy, "shapes", "Integer");
-  st->npoints = get_integer_resource(st->dpy, "points", "Integer");
-  st->npolys = get_integer_resource(st->dpy, "polys", "Integer");
-  st->max_speed = get_integer_resource(st->dpy, "speed", "Speed");
+  st->nshapes = max(1, get_integer_resource(st->dpy, "shapes", "Integer"));
+  st->npoints = max(2, get_integer_resource(st->dpy, "points", "Integer"));
+  st->npolys = max(1, 1 + get_integer_resource(st->dpy, "trails", "Integer"));
+  st->max_speed = max(1, get_integer_resource(st->dpy, "speed", "Speed"));
   st->delay = get_integer_resource(st->dpy, "delay", "Integer");
   st->dbuf = get_boolean_resource(st->dpy, "doubleBuffer", "Boolean");
 
@@ -347,7 +350,7 @@ static const char *mystical_defaults [] = {
   "*delay:		30000",
   "*shapes:		2",
   "*points:		4",
-  "*polys:		6",
+  "*trails:		5",
   "*speed:		20",
   "*thickness:		1",
   "*boldColors:		False",
@@ -366,7 +369,7 @@ static XrmOptionDescRec mystical_options[] = {
     {"-delay",		".delay",		XrmoptionSepArg, 0},
     {"-shapes",		".shapes",		XrmoptionSepArg, 0},
     {"-points",		".points",		XrmoptionSepArg, 0},
-    {"-polys",		".polys",		XrmoptionSepArg, 0},
+    {"-trails",		".trails",		XrmoptionSepArg, 0},
     {"-speed",		".speed",		XrmoptionSepArg, 0},
     {"-thickness",	".thickness",		XrmoptionSepArg, 0},
     {"-bold-colors",	".boldColors",		XrmoptionNoArg,  "True"},
