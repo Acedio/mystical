@@ -19,16 +19,16 @@
           _label="Lines" _low-label="Thin" _high-label="Thick"
           low="1" high="50" default="1"/>
 
-  <number id="shapes" type="slider" arg="-shapes %"
-          _label="Shapes" _low-label="1" _high-label="20"
+  <number id="polygons" type="spinbutton" arg="-polys %"
+          _label="Polygons" _low-label="1" _high-label="20"
            low="1" high="20" default="2"/>
 
-  <number id="points" type="slider" arg="-points %"
+  <number id="points" type="spinbutton" arg="-points %"
           _label="Points" _low-label="2" _high-label="20"
            low="2" high="20" default="4"/>
 
-  <number id="trails" type="slider" arg="-trails %"
-          _label="Trailing polygons" _low-label="0" _high-label="20"
+  <number id="trails" type="spinbutton" arg="-trails %"
+          _label="Trails" _low-label="0" _high-label="20"
            low="0" high="20" default="5"/>
 
   <boolean id="boldColors" _label="Use bold color palette"

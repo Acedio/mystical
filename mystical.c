@@ -1,7 +1,6 @@
 /* mystical, Copyright (c) 2020 Josh Simmons <josh.simmons@gmail.com>
  *
- * This is inspired by the old "Mystify" screensaver on Windows, but is original
- * code.
+ * A screensaver inspired by the classic "Mystify Your Mind" from Windows.
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that
@@ -209,7 +208,7 @@ static void *mystical_init(Display *dpy, Window window) {
   int i;
   st->dpy = dpy;
   st->window = window;
-  st->nshapes = max(1, get_integer_resource(st->dpy, "shapes", "Integer"));
+  st->nshapes = max(1, get_integer_resource(st->dpy, "polys", "Integer"));
   st->npoints = max(2, get_integer_resource(st->dpy, "points", "Integer"));
   st->npolys = max(1, 1 + get_integer_resource(st->dpy, "trails", "Integer"));
   st->max_speed = max(1, get_integer_resource(st->dpy, "speed", "Speed"));
@@ -348,7 +347,7 @@ static void mystical_free(Display *dpy, Window window, void *closure) {
 static const char *mystical_defaults [] = {
   ".background:		black",
   "*delay:		30000",
-  "*shapes:		2",
+  "*polys:		2",
   "*points:		4",
   "*trails:		5",
   "*speed:		20",
@@ -367,7 +366,7 @@ static const char *mystical_defaults [] = {
 
 static XrmOptionDescRec mystical_options[] = {
     {"-delay",		".delay",		XrmoptionSepArg, 0},
-    {"-shapes",		".shapes",		XrmoptionSepArg, 0},
+    {"-polys",		".polys",		XrmoptionSepArg, 0},
     {"-points",		".points",		XrmoptionSepArg, 0},
     {"-trails",		".trails",		XrmoptionSepArg, 0},
     {"-speed",		".speed",		XrmoptionSepArg, 0},

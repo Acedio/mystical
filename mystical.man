@@ -8,7 +8,7 @@ mystical - bouncing polygons.
 [\-window]
 [\-root]
 [\-delay \fInumber\fP]
-[\-shapes \fInumber\fP]
+[\-polys \fInumber\fP]
 [\-points \fInumber\fP]
 [\-trails \fInumber\fP]
 [\-thickness \fInumber\fP]
@@ -33,14 +33,14 @@ Draw on the root window.
 .B \-delay \fInumber\fP
 Per-frame delay, in microseconds.  Default: 30000 (0.3 seconds.).
 .TP 8
-.B \-shapes \fInumber\fP
+.B \-polys \fInumber\fP
 Number of polygons.  Default: 2.
 .TP 8
 .B \-points \fInumber\fP
 Number of points in each polygon.  Default: 4.
 .TP 8
 .B \-trails \fInumber\fP
-Number of trailing polygons in each shape.  Default: 5.
+Number of trailing polygons behind each leading polygon.  Default: 5.
 .TP 8
 .B \-thickness \fInumber\fP
 Thickness of lines.  Default: 1.
