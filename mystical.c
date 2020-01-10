@@ -85,11 +85,11 @@ static int random_velocity(int positive, int max_speed) {
   }
 }
 
-static void draw_shape(struct state *st, Drawable w, struct shape *s) {
+static void draw_shape(struct state *st, Drawable d, struct shape *s) {
   int i;
   for (i = 0; i < s->npolys; ++i) {
     XSetForeground(st->dpy, s->gc, st->colors[s->color_index].pixel);
-    XDrawLines(st->dpy, w, s->gc, s->polys[i], s->npoints + 1, CoordModeOrigin);
+    XDrawLines(st->dpy, d, s->gc, s->polys[i], s->npoints + 1, CoordModeOrigin);
   }
 }
 
@@ -224,8 +224,19 @@ static void *mystical_init(Display *dpy, Window window) {
 #endif
 
   XGetWindowAttributes(st->dpy, st->window, &st->xgwa);
+
   st->w = st->xgwa.width;
   st->h = st->xgwa.height;
+
+  st->ncolors = NCOLORS;
+  st->colors = (XColor *)calloc(st->ncolors, sizeof(XColor));
+  if (get_boolean_resource(st->dpy, "boldColors", "Boolean") == True) {
+    make_uniform_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
+                          st->colors, &st->ncolors, True, False, True);
+  } else {
+    make_smooth_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
+                         st->colors, &st->ncolors, True, False, True);
+  }
 
   if (st->dbuf) {
 #ifdef HAVE_DOUBLE_BUFFER_EXTENSION
@@ -245,16 +256,6 @@ static void *mystical_init(Display *dpy, Window window) {
     }
   } else {
     st->b = st->window;
-  }
-
-  st->ncolors = NCOLORS;
-  st->colors = (XColor *)calloc(st->ncolors, sizeof(XColor));
-  if (get_boolean_resource(st->dpy, "boldColors", "Boolean") == True) {
-    make_uniform_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
-                          st->colors, &st->ncolors, True, False, True);
-  } else {
-    make_smooth_colormap(st->xgwa.screen, st->xgwa.visual, st->xgwa.colormap,
-                         st->colors, &st->ncolors, True, False, True);
   }
 
   st->shapes = (struct shape **)calloc(st->nshapes, sizeof(struct shape *));
@@ -314,6 +315,7 @@ static void mystical_reshape(Display *dpy, Window window, void *closure,
                              unsigned int w, unsigned int h) {
   struct state *st = (struct state *)closure;
   int i;
+
   st->w = w;
   st->h = h;
 
