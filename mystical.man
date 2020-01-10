@@ -17,7 +17,7 @@ mystical - bouncing polygons.
 [\-fps]
 .SH DESCRIPTION
 This draws colorful polygons that bounce around the screen and leave trails.
-Inspired by the old "Mystify" screensaver on Windows.
+Inspired by the old "Mystify Your Mind" screensaver on Windows.
 .SH OPTIONS
 .TP 8
 .B \-visual \fIvisual\fP
